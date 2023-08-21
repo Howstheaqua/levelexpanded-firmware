@@ -101,6 +101,10 @@ typedef struct {
  */
 void furi_hal_nfc_init();
 
+/** Deinit nfc
+ */
+void furi_hal_nfc_deinit();
+
 /** Check if nfc worker is busy
  *
  * @return     true if busy
@@ -418,6 +422,10 @@ FuriHalNfcReturn furi_hal_nfc_ll_txrx_bits(
     uint32_t fwt);
 
 void furi_hal_nfc_ll_poll();
+
+void furi_hal_nfc_field_detect_start();
+
+bool furi_hal_nfc_field_is_present();
 
 #ifdef __cplusplus
 }

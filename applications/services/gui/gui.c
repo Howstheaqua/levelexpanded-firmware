@@ -17,6 +17,26 @@ ViewPort* gui_view_port_find_enabled(ViewPortArray_t array) {
     return NULL;
 }
 
+size_t gui_active_view_port_count(Gui* gui, GuiLayer layer) {
+    furi_assert(gui);
+    furi_check(layer < GuiLayerMAX);
+    size_t ret = 0;
+
+    gui_lock(gui);
+    ViewPortArray_it_t it;
+    ViewPortArray_it_last(it, gui->layers[layer]);
+    while(!ViewPortArray_end_p(it)) {
+        ViewPort* view_port = *ViewPortArray_ref(it);
+        if(view_port_is_enabled(view_port)) {
+            ret++;
+        }
+        ViewPortArray_previous(it);
+    }
+    gui_unlock(gui);
+
+    return ret;
+}
+
 void gui_update(Gui* gui) {
     furi_assert(gui);
     if(!gui->direct_draw) furi_thread_flags_set(gui->thread_id, GUI_THREAD_FLAG_DRAW);
@@ -50,7 +70,13 @@ static void gui_redraw_status_bar(Gui* gui, bool need_attention) {
     uint8_t left_used = 0;
     uint8_t right_used = 0;
     uint8_t width;
-    canvas_set_orientation(gui->canvas, CanvasOrientationHorizontal);
+
+    if(furi_hal_rtc_is_flag_set(FuriHalRtcFlagHandOrient)) {
+        canvas_set_orientation(gui->canvas, CanvasOrientationHorizontalFlip);
+    } else {
+        canvas_set_orientation(gui->canvas, CanvasOrientationHorizontal);
+    }
+
     canvas_frame_set(
         gui->canvas, GUI_STATUS_BAR_X, GUI_STATUS_BAR_Y, GUI_DISPLAY_WIDTH, GUI_STATUS_BAR_HEIGHT);
 
@@ -244,6 +270,7 @@ static void gui_redraw(Gui* gui) {
                 p->callback(
                     canvas_get_buffer(gui->canvas),
                     canvas_get_buffer_size(gui->canvas),
+                    canvas_get_orientation(gui->canvas),
                     p->context);
             }
     } while(false);

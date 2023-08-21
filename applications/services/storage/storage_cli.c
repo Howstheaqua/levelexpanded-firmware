@@ -3,7 +3,7 @@
 
 #include <cli/cli.h>
 #include <lib/toolbox/args.h>
-#include <lib/toolbox/md5.h>
+#include <lib/toolbox/md5_calc.h>
 #include <lib/toolbox/dir_walk.h>
 #include <storage/storage.h>
 #include <storage/storage_sd_api.h>
@@ -131,7 +131,7 @@ static void storage_cli_list(Cli* cli, FuriString* path) {
 
             while(storage_dir_read(file, &fileinfo, name, MAX_NAME_LENGTH)) {
                 read_done = true;
-                if(fileinfo.flags & FSF_DIRECTORY) {
+                if(file_info_is_dir(&fileinfo)) {
                     printf("\t[D] %s\r\n", name);
                 } else {
                     printf("\t[F] %s %lub\r\n", name, (uint32_t)(fileinfo.size));
@@ -169,7 +169,7 @@ static void storage_cli_tree(Cli* cli, FuriString* path) {
 
             while(dir_walk_read(dir_walk, name, &fileinfo) == DirWalkOK) {
                 read_done = true;
-                if(fileinfo.flags & FSF_DIRECTORY) {
+                if(file_info_is_dir(&fileinfo)) {
                     printf("\t[D] %s\r\n", furi_string_get_cstr(name));
                 } else {
                     printf(
@@ -383,7 +383,7 @@ static void storage_cli_stat(Cli* cli, FuriString* path) {
         FS_Error error = storage_common_stat(api, furi_string_get_cstr(path), &fileinfo);
 
         if(error == FSE_OK) {
-            if(fileinfo.flags & FSF_DIRECTORY) {
+            if(file_info_is_dir(&fileinfo)) {
                 printf("Directory\r\n");
             } else {
                 printf("File, size: %lub\r\n", (uint32_t)(fileinfo.size));
@@ -482,34 +482,16 @@ static void storage_cli_md5(Cli* cli, FuriString* path) {
     UNUSED(cli);
     Storage* api = furi_record_open(RECORD_STORAGE);
     File* file = storage_file_alloc(api);
+    FuriString* md5 = furi_string_alloc();
+    FS_Error file_error;
 
-    if(storage_file_open(file, furi_string_get_cstr(path), FSAM_READ, FSOM_OPEN_EXISTING)) {
-        const uint16_t buffer_size = 512;
-        const uint8_t hash_size = 16;
-        uint8_t* data = malloc(buffer_size);
-        uint8_t* hash = malloc(sizeof(uint8_t) * hash_size);
-        md5_context* md5_ctx = malloc(sizeof(md5_context));
-
-        md5_starts(md5_ctx);
-        while(true) {
-            uint16_t read_size = storage_file_read(file, data, buffer_size);
-            if(read_size == 0) break;
-            md5_update(md5_ctx, data, read_size);
-        }
-        md5_finish(md5_ctx, hash);
-        free(md5_ctx);
-
-        for(uint8_t i = 0; i < hash_size; i++) {
-            printf("%02x", hash[i]);
-        }
-        printf("\r\n");
-
-        free(hash);
-        free(data);
+    if(md5_string_calc_file(file, furi_string_get_cstr(path), md5, &file_error)) {
+        printf("%s\r\n", furi_string_get_cstr(md5));
     } else {
-        storage_cli_print_error(storage_file_get_error(file));
+        storage_cli_print_error(file_error);
     }
 
+    furi_string_free(md5);
     storage_file_close(file);
     storage_file_free(file);
 
